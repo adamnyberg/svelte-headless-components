@@ -1,34 +1,44 @@
 <script lang="ts">
-  import Select from '$lib/components/select/Select.svelte';
-  import type { SelectClasses } from '$lib/components/select/select.js';
-  import Item from '$lib/demo/Item.svelte';
-  import SelectButton from '$lib/demo/SelectButton.svelte';
-  import AddTextButton from '$lib/demo/AddTextButton.svelte';
+  import { Select, type InputOptionItem } from '$lib/components/select/select.js';
+  import Svelect from '$lib/demo/select/Svelect.svelte';
+  import { get } from 'svelte/store';
 
-  const options = ['Stone', 'Branch', 'Flower', 'Grass'].map((label) => ({
-    label,
-    value: label,
-    selected: false,
-    active: false,
-  }));
-
-  let simpleOptions = [
-    { value: null, label: 'No option', selected: false, active: false },
-    ...structuredClone(options),
+  const options: InputOptionItem[] = [
+    { label: 'Bug' },
+    {
+      label: 'Colors',
+      type: 'menu',
+      subOptions: [{ label: 'Blue' }, { label: 'Red' }, { label: 'Yellow' }, { label: 'Green' }],
+    },
+    {
+      label: 'Pokemons',
+      type: 'menu',
+      subOptions: [
+        {
+          label: 'Water',
+          type: 'menu',
+          subOptions: [{ label: 'Squirtle' }, { label: 'Wartortle' }, { label: 'Blastoise' }],
+        },
+        {
+          label: 'Fire',
+          type: 'menu',
+          subOptions: [{ label: 'Charmander' }, { label: 'Charmeleon' }, { label: 'Charizard' }],
+        },
+        {
+          label: 'Grass',
+          type: 'menu',
+          subOptions: [{ label: 'Bulbasaur' }, { label: 'Ivysaur' }, { label: 'Venusaur' }],
+        },
+      ],
+    },
   ];
 
-  let multiOptions = structuredClone(options);
+  let simpleOptions: InputOptionItem[] = [{ type: 'select', label: 'No option' }, ...structuredClone(options)];
+  let simpleSelect = new Select(simpleOptions);
+  let { options: selectOptions } = simpleSelect;
 
-  const baseStyle: SelectClasses = {
-    select: 'relative',
-    dropdown: 'absolute z-10 bg-white flex flex-col border rounded border-gray-400 shadow-md py-1',
-    input: 'bg-white border-solid border outline-none px-2',
-  };
-  const components = {
-    item: Item,
-    button: SelectButton,
-    addTextButton: AddTextButton,
-  };
+  let multiOptions = structuredClone(options);
+  let multiSelect = new Select(multiOptions, { isMulti: true });
 </script>
 
 <div class="flex flex-col max-w-2xl gap-12 m-auto mt-12 mb-6">
@@ -36,49 +46,34 @@
 
   <div>
     <h2 class="text-xl">Allow add option</h2>
-    <Select
-      {components}
-      bind:options={simpleOptions}
-      on:close={() => console.log('on:close')}
-      on:open={() => console.log('on:open')}
-      on:select={({ detail }) => console.log('on:select', detail)}
-      on:addText={({ detail }) => {
-        console.log('on:addText', detail);
-        simpleOptions = [
-          ...simpleOptions.map((option) => {
-            option.selected = false;
-            return option;
-          }),
-          { label: detail, value: detail, selected: true, active: false },
-        ];
-      }}
-      classes={baseStyle}
-      inputPlaceholder="Search or add..."
-      allowAddText
-    />
+    <div class="flex justify-between gap-10">
+      <Svelect
+        select={simpleSelect}
+        showSearch
+        on:close={() => console.log('on:close')}
+        on:open={() => console.log('on:open', 'simple')}
+        on:select={({ detail }) => console.log('on:select', detail)}
+        on:addOption={({ detail }) => {
+          console.log('on:addOption', detail);
+        }}
+      />
+      <pre class="text-xs">
+        <!-- {JSON.stringify($selectOptions, null, 2)} -->
+      </pre>
+    </div>
   </div>
 
   <div>
     <h2 class="text-xl">Multi select</h2>
-    <Select
-      {components}
-      bind:options={multiOptions}
+    <Svelect
+      select={multiSelect}
+      showSearch
       on:close={() => console.log('on:close')}
-      on:open={() => console.log('on:open')}
+      on:open={() => console.log('on:open', 'multi')}
       on:select={({ detail }) => console.log('on:select', detail)}
-      on:addText={({ detail }) => {
-        console.log('on:addText', detail);
-        multiOptions = [
-          ...multiOptions.map((option) => {
-            option.active = false;
-            return option;
-          }),
-          { label: detail, value: detail, selected: true, active: true },
-        ];
+      on:addOption={({ detail }) => {
+        console.log('on:addOption', detail);
       }}
-      classes={baseStyle}
-      isMulti
-      allowAddText
     />
   </div>
 </div>
