@@ -4,7 +4,8 @@
   import { get } from 'svelte/store';
 
   const options: InputOptionItem[] = [
-    { label: 'Bug' },
+    { label: 'Yellow bug' },
+    { label: 'Cheetah' },
     {
       label: 'Colors',
       type: 'menu',
@@ -31,14 +32,22 @@
         },
       ],
     },
+    {
+      label: 'Labels',
+      type: 'menu',
+      subOptions: [
+        { label: 'Bug', isMulti: true },
+        { label: 'Feature', isMulti: true },
+        { label: 'Help', isMulti: true },
+      ],
+    },
   ];
 
   let simpleOptions: InputOptionItem[] = [{ type: 'select', label: 'No option' }, ...structuredClone(options)];
   let simpleSelect = new Select(simpleOptions);
-  let { options: selectOptions } = simpleSelect;
 
   let multiOptions = structuredClone(options);
-  let multiSelect = new Select(multiOptions, { isMulti: true });
+  let multiSelect = new Select(multiOptions);
 </script>
 
 <div class="flex flex-col max-w-2xl gap-12 m-auto mt-12 mb-6">
@@ -65,7 +74,7 @@
 
   <div>
     <h2 class="text-xl">Multi select</h2>
-    <Svelect
+    <!-- <Svelect
       select={multiSelect}
       showSearch
       on:close={() => console.log('on:close')}
@@ -74,6 +83,6 @@
       on:addOption={({ detail }) => {
         console.log('on:addOption', detail);
       }}
-    />
+    /> -->
   </div>
 </div>

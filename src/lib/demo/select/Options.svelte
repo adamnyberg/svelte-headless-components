@@ -14,6 +14,7 @@
   let floatingOptions: Record<string, [ReferenceAction, ContentAction, UpdatePosition]> = {};
 
   $: {
+    floatingOptions = {};
     options.forEach((option) => {
       if (option.type === 'menu') {
         floatingOptions[option.id] = createFloatingActions({
@@ -42,25 +43,27 @@
 </script>
 
 {#each options as option}
-  <button
-    on:mouseenter={() => {
-      select.setActive(option);
-    }}
-    class="w-full"
-    on:click={() => {
-      if (option.type === 'select') select.selectOption(option.id);
-    }}
-    use:floatingReference={option.id}
-  >
+  {#if option.type === 'menu' && option.active && floatingOptions[option.id]}
+    <button
+      on:mouseenter={() => {
+        select.setActive(option);
+      }}
+      use:floatingReference={option.id}
+    />
     <Item {option} />
-  </button>
-
-  {#if option.type === 'menu'}
-    <div
-      class="{option.active ? '' : 'hidden'} flex flex-col bg-white border border-slate-300 rounded shadow-md pb-1"
-      use:floatingContent={option.id}
-    >
+    <div class="flex flex-col bg-white border border-slate-300 rounded shadow-md pb-1" use:floatingContent={option.id}>
       <svelte:self {select} options={option.subOptions} />
     </div>
+  {:else}
+    <button
+      on:mouseenter={() => {
+        select.setActive(option);
+      }}
+      on:click={() => {
+        select.selectOption(option.id);
+      }}
+    >
+      <Item {option} />
+    </button>
   {/if}
 {/each}

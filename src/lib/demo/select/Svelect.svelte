@@ -4,6 +4,7 @@
   import { offset } from 'svelte-floating-ui/dom';
   import { createFloatingActions } from 'svelte-floating-ui';
   import Options from './Options.svelte';
+  import SearchOptions from './SearchOptions.svelte';
   import { clickOutside, focusElement } from '../utils.js';
 
   const dispatch = createEventDispatcher<{ select: OptionItem; addOption: string; open: void; close: void }>();
@@ -11,24 +12,6 @@
   export let select: Select;
   export let showSearch = false;
   export let inputPlaceholder = 'Search...';
-
-  // function onInputChange(inputTextValue: string) {
-  //   if (!isOpen || !inputTextValue) {
-  //     return;
-  //   }
-  //   console.log('onInputChange', inputTextValue);
-  //   // update active option
-  //   const filteredOptions = filterInput(options, inputTextValue);
-  //   const activeOption = getActiveOption(filteredOptions, isAddTextActive);
-  //   if (activeOption === undefined) {
-  //     const selectOptions = getSelectOptionsFlat(filteredOptions);
-  //     if (selectOptions[0] !== undefined) {
-  //       setActiveOption(selectOptions[0]);
-  //     } else if (allowAddText) {
-  //       setActiveOption('addText');
-  //     }
-  //   }
-  // }
 
   onMount(() => {
     select.isOpen.subscribe((value) => {
@@ -41,6 +24,10 @@
         dispatch('close');
       }
     });
+
+    select.onSelect.subscribe((option) => {
+      dispatch('select', option);
+    });
   });
 
   const [floatingRef, floatingContent] = createFloatingActions({
@@ -51,10 +38,7 @@
 
   let inputRef: HTMLInputElement;
   let buttonRef: HTMLButtonElement;
-
-  let { isOpen, search, selected, options } = select;
-
-  $: console.log('options', $options);
+  let { isOpen, search, selected, filteredOptions, searchOptions } = select;
 </script>
 
 <svelte:window
@@ -87,23 +71,34 @@
   </button>
 
   {#if $isOpen}
-    <div class="absolute flex flex-col bg-white border border-slate-300 rounded shadow-md pb-1" use:floatingContent>
-      {#if showSearch || select.config.additions}
-        <div class="">
-          <input
-            type="text"
-            class="bg-white border-solid border outline-none px-2 rounded-t py-1"
-            bind:this={inputRef}
-            bind:value={$search}
-            placeholder={inputPlaceholder}
-            spellcheck="false"
-            autocomplete="off"
-            use:focusElement
-          />
+    <div
+      class="absolute flex flex-col divide-y bg-white border border-slate-300 rounded shadow-md pb-1"
+      use:floatingContent
+    >
+      {#if showSearch || select.config.allowAdditions}
+        <input
+          type="text"
+          class="bg-white outline-none px-2 rounded-t py-1"
+          bind:this={inputRef}
+          bind:value={$search}
+          placeholder={inputPlaceholder}
+          spellcheck="false"
+          autocomplete="off"
+          use:focusElement
+        />
+      {/if}
+
+      {#if $filteredOptions.length > 0}
+        <div class="flex flex-col">
+          <Options {select} options={$filteredOptions} />
         </div>
       {/if}
 
-      <Options {select} options={$options} />
+      {#if $search && $searchOptions.length > 0}
+        <div class="flex flex-col">
+          <SearchOptions {select} options={$searchOptions} />
+        </div>
+      {/if}
     </div>
   {/if}
 </div>

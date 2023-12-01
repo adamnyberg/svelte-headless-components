@@ -1,51 +1,56 @@
-import type { ComponentType } from 'svelte';
 import { get, writable, type Writable } from 'svelte/store';
 
 type OptionBase = {
   id: string;
   label: string;
   active: boolean;
-  parent: MenuOption | null;
+  parent: OptionMenu | null;
   data?: Record<string, any>;
 };
 
-export type SelectOption = OptionBase & {
+export type OptionSelect = OptionBase & {
   type: 'select';
   selected: boolean;
   isAdd: boolean;
+  isMulti: boolean;
 };
-export type InputSelectOption = Partial<Omit<SelectOption, 'label'>> & Pick<SelectOption, 'label'>;
+export type InputSelectOption = Partial<Omit<OptionSelect, 'label'>> & Pick<OptionSelect, 'label'>;
 
-export type MenuOption = OptionBase & {
+export type OptionMenu = OptionBase & {
   type: 'menu';
   hasSelected: boolean;
   subOptions: OptionItem[];
 };
-export type InputMenuOption = Partial<Omit<MenuOption, 'label' | 'subOptions'>> &
-  Pick<MenuOption, 'label'> & { subOptions: InputOptionItem[] };
+export type InputMenuOption = Partial<Omit<OptionMenu, 'label' | 'subOptions'>> &
+  Pick<OptionMenu, 'label'> & { subOptions: InputOptionItem[] };
 
-export type Additions = {
-  prefix: string;
-  minLength: number;
-};
+export type CloseOnSelect = 'never' | 'always' | 'not_multi';
 export type SelectConfig = {
-  isMulti?: boolean;
-  additions?: Additions;
+  allowAdditions: boolean;
+  closeOnSelect: CloseOnSelect;
 };
 
-export type OptionItem = SelectOption | MenuOption;
+export type OptionItem = OptionSelect | OptionMenu;
 
 export type InputOptionItem = InputMenuOption | InputSelectOption;
 
+const searchOptionPrefix = 'search';
+
 export class Select {
-  readonly options: Writable<OptionItem[]>;
-  readonly selected: Writable<SelectOption[]>;
-  readonly onSelect: Writable<SelectOption>;
+  readonly inputOptions: Writable<OptionItem[]>;
+  readonly filteredOptions: Writable<OptionItem[]>;
+  readonly searchOptions: Writable<OptionSelect[]>;
+  // readonly addOption: Writable<OptionSelect | null>;
+  readonly selected: Writable<OptionSelect[]>;
+  readonly onSelect: Writable<OptionSelect>;
   readonly isOpen = writable(false);
   search: Writable<string>;
   config: SelectConfig;
 
-  constructor(inputOptions: InputOptionItem[], config: SelectConfig = { isMulti: false }) {
+  constructor(
+    inputOptions: InputOptionItem[],
+    config: SelectConfig = { allowAdditions: false, closeOnSelect: 'not_multi' },
+  ) {
     const options = inputOptions.map((option) => Select.inputToOptionItem(option));
 
     const selectOptions = Select.toFlatSelect(options);
@@ -54,27 +59,19 @@ export class Select {
       throw new Error('Select must have at least one option');
     }
 
-    const selected = selectOptions.filter((option) => option.selected);
-    if (!config.isMulti && selected.length > 1) {
-      for (const option of selected.slice(1)) {
-        option.selected = false;
-      }
-    }
+    this.onSelect = writable();
 
-    if (selected.length === 0 && !config.isMulti) {
-      selectOptions[0].selected = true;
-      this.onSelect = writable(selectOptions[0]);
-    } else {
-      this.onSelect = writable(selected[0]);
-    }
-
-    this.options = writable(options);
+    this.inputOptions = writable(options);
+    this.filteredOptions = writable(options);
+    this.searchOptions = writable([]);
     this.config = config;
 
     this.selected = writable([]);
-    this.options.subscribe((options) => {
+    this.inputOptions.subscribe((options) => {
       const newSelected = Select.toFlatSelect(options).filter((option) => option.selected);
       this.selected.set(newSelected);
+      this.updateFilteredOptions(options);
+      // this.updateSearchOptions(options);
     });
 
     this.search = writable('');
@@ -84,7 +81,6 @@ export class Select {
   }
 
   open(): void {
-    console.log('open');
     const selected = get(this.selected);
     if (selected.length > 0) {
       this.setActive(selected[0]);
@@ -101,7 +97,6 @@ export class Select {
   }
 
   toggleIsOpen(): void {
-    console.log('toggleIsOpen');
     if (get(this.isOpen)) {
       this.close();
     } else {
@@ -109,27 +104,18 @@ export class Select {
     }
   }
 
-  getOption(id: string): OptionItem | null {
-    const option = Select.toFlat(get(this.options)).find((option) => option.id === id);
-    return option ?? null;
-  }
-
-  getSelectOption(id: string): SelectOption | null {
-    const option = this.getOption(id);
-    if (option === null || option.type === 'menu') {
-      return null;
+  selectOption(id: string): OptionSelect | null {
+    if (this.isSearchOptionId(id)) {
+      id = id.split(':').at(-1) ?? '';
     }
-    return option;
-  }
 
-  selectOption(id: string): SelectOption {
     const option = this.getSelectOption(id);
     if (option === null) {
-      throw new Error(`option with id ${id} not found`);
+      return null;
     }
-    // if not multi then deselect all other options
-    if (!this.config.isMulti) {
-      const optionsFlat = Select.toFlat(get(this.options));
+
+    if (!option.isMulti) {
+      const optionsFlat = Select.toFlat(get(this.inputOptions));
       for (const o of optionsFlat) {
         if (o.type === 'select') {
           o.selected = false;
@@ -145,16 +131,35 @@ export class Select {
       }
     }
 
-    option.selected = this.config.isMulti ? !option.selected : true;
+    option.selected = option.isMulti ? !option.selected : true;
 
-    this.options.set(get(this.options));
+    this.inputOptions.set(get(this.inputOptions));
+    this.updateSearchOptions();
 
     this.onSelect.set(option);
 
-    if (!this.config.isMulti) {
+    const closeOnSelect = this.config.closeOnSelect;
+    if (closeOnSelect === 'always' || (!option.isMulti && closeOnSelect === 'not_multi')) {
       this.close();
     }
 
+    return option;
+  }
+
+  getMenuOptions(): OptionMenu[] {
+    return Select.toFlat(get(this.inputOptions)).filter((option) => option.type === 'menu') as OptionMenu[];
+  }
+
+  getOption(id: string): OptionItem | null {
+    const option = Select.toFlat(this.getAllOptions()).find((option) => option.id === id);
+    return option ?? null;
+  }
+
+  getSelectOption(id: string): OptionSelect | null {
+    const option = this.getOption(id);
+    if (option === null || option.type === 'menu') {
+      return null;
+    }
     return option;
   }
 
@@ -166,14 +171,15 @@ export class Select {
     return active.at(-1) ?? null;
   }
 
-  getActiveList(options = get(this.options)): OptionItem[] {
-    return Select.toFlat(options).filter((option) => option.active);
+  getActiveList(): OptionItem[] {
+    return Select.toFlat(this.getAllOptions()).filter((option) => option.active);
   }
 
   setActive(setOption: OptionItem | null): void {
-    const optionsFlat = Select.toFlat(get(this.options));
+    const optionsFlat = Select.toFlat(get(this.inputOptions));
+    const searchOptions = get(this.searchOptions);
 
-    for (const option of optionsFlat) {
+    for (const option of [...optionsFlat, ...searchOptions]) {
       if (setOption && setOption.id === option.id) {
         option.active = true;
       } else {
@@ -181,13 +187,17 @@ export class Select {
       }
     }
 
-    let parent = setOption?.parent;
-    while (parent) {
-      parent.active = true;
-      parent = parent.parent;
+    if (setOption !== null && !this.isSearchOptionId(setOption.id)) {
+      let parent = setOption?.parent;
+      while (parent) {
+        parent.active = true;
+        parent = parent.parent;
+      }
     }
 
-    this.options.set(get(this.options));
+    this.inputOptions.set(get(this.inputOptions));
+    this.searchOptions.set(get(this.searchOptions));
+    const active = this.getActiveLeaf();
   }
 
   setPrevActive(): void {
@@ -215,6 +225,7 @@ export class Select {
     const activeIndex = siblings.findIndex((option) => option.id === active.id);
     const nextIndex = Math.min(activeIndex + 1, siblings.length - 1);
     const next = siblings[nextIndex];
+
     this.setActive(next);
   }
 
@@ -244,28 +255,51 @@ export class Select {
     }
   }
 
-  private getSiblings(option: OptionItem): OptionItem[] {
-    if (option.parent) {
-      return option.parent.subOptions;
-    }
-    return get(this.options);
-  }
-
   private onSearchChange(search: string) {
-    if (this.config.additions) {
-      this.updateAddableOption(search);
+    if (this.config.allowAdditions) {
+      // this.updateAddableOption(search);
     }
+    const options = get(this.inputOptions);
+
+    const filtered = options.filter((option) => filterText(option, search));
+    const subSelectOptions = Select.toFlatSelect(options)
+      .filter((o) => o.parent !== null && filterText(o, search))
+      .map(Select.toSearchOption);
+
+    this.filteredOptions.set(filtered);
+    this.searchOptions.set(subSelectOptions);
+
+    this.setFirstActive();
   }
 
-  private setFirstActive() {
-    const options = get(this.options);
-    if (options.length === 0) {
-      return;
-    }
-    this.setActive(options[0]);
+  private isSearchOptionId(id: string): boolean {
+    return id.startsWith(searchOptionPrefix);
   }
 
-  private static toFlat(options: OptionItem[]): OptionItem[] {
+  private updateFilteredOptions(options: OptionItem[]) {
+    const search = get(this.search);
+    const filtered = options.filter((option) => filterText(option, search));
+    this.filteredOptions.set(filtered);
+  }
+
+  private updateSearchOptions() {
+    const search = get(this.search);
+    const active = this.getActiveLeaf();
+
+    const subSelectOptions = [];
+    for (const option of Select.toFlatSelect(get(this.inputOptions))) {
+      if (option.parent !== null && filterText(option, search)) {
+        const newOption = Select.toSearchOption(option);
+        if (active?.id === newOption.id) {
+          newOption.active = true;
+        }
+        subSelectOptions.push(newOption);
+      }
+    }
+    this.searchOptions.set(subSelectOptions);
+  }
+
+  static toFlat(options: OptionItem[]): OptionItem[] {
     const flat: OptionItem[] = [];
     for (const option of options) {
       flat.push(option);
@@ -276,8 +310,55 @@ export class Select {
     return flat;
   }
 
-  private static toFlatSelect(options: OptionItem[]): SelectOption[] {
-    return Select.toFlat(options).filter((option) => option.type === 'select') as SelectOption[];
+  static getParentLabels(option: OptionItem): string[] {
+    const labels = [];
+    let parent = option.parent;
+    while (parent) {
+      labels.push(parent.label);
+      parent = parent.parent;
+    }
+    return labels.reverse();
+  }
+
+  static toFlatSelect(options: OptionItem[]): OptionSelect[] {
+    return Select.toFlat(options).filter((option) => option.type === 'select') as OptionSelect[];
+  }
+
+  private getSiblings(option: OptionItem): OptionItem[] {
+    if (option.parent && !this.isSearchOptionId(option.id)) {
+      return option.parent.subOptions;
+    }
+
+    if (get(this.search).length > 0) {
+      return this.getShowingSearchOptions();
+    }
+
+    return get(this.filteredOptions);
+  }
+
+  private setFirstActive() {
+    const filteredOptions = get(this.filteredOptions);
+    const searchOptions = get(this.searchOptions);
+    if (filteredOptions.length > 0) {
+      this.setActive(filteredOptions[0]);
+    } else if (searchOptions.length > 0) {
+      this.setActive(searchOptions[0]);
+    }
+  }
+
+  private getAllOptions(): OptionItem[] {
+    return [...get(this.inputOptions), ...get(this.searchOptions)];
+  }
+
+  private getShowingSearchOptions(): OptionItem[] {
+    return [...get(this.filteredOptions), ...get(this.searchOptions)];
+  }
+
+  private static toSearchOption(option: OptionSelect): OptionSelect {
+    return {
+      ...option,
+      id: [searchOptionPrefix, ...Select.getParentLabels(option)].join(':') + ':' + option.id,
+    };
   }
 
   private static inputToOptionItem(input: InputOptionItem, parent?: OptionItem): OptionItem {
@@ -285,9 +366,17 @@ export class Select {
     switch (input.type) {
       case 'select':
         const withDefaults = {
-          ...{ type: 'select', id: input.label, selected: false, active: false, isAdd: false, parent: parent ?? null },
+          ...{
+            type: 'select',
+            id: input.label,
+            selected: false,
+            active: false,
+            isAdd: false,
+            parent: parent ?? null,
+            isMulti: false,
+          },
           ...input,
-        } as SelectOption;
+        } as OptionSelect;
         return withDefaults;
 
       case 'menu':
@@ -305,7 +394,7 @@ export class Select {
             subOptions: [],
           },
           ...input,
-        } as MenuOption;
+        } as OptionMenu;
 
         const subOptions = input.subOptions.map((o) => {
           return Select.inputToOptionItem(o, menuOption);
@@ -316,56 +405,44 @@ export class Select {
     }
   }
 
-  private static filterOptions(options: OptionItem[], input: string): OptionItem[] {
-    const filtered = [];
-    for (const option of options) {
-      if (option.type === 'menu' && option.subOptions.filter((o) => filterText(input, o)).length > 0) {
-        filtered.push(option);
-      } else if (option.type === 'select' && filterText(input, option)) {
-        filtered.push(option);
-      }
-    }
-    return filtered;
-  }
-
-  private updateAddableOption(search: string, config: SelectConfig = this.config) {
-    const options = get(this.options);
-    let didChange = false;
-    if (config.additions) {
-      if (
-        search.length >= config.additions.minLength &&
-        !options.some((option) => option.type === 'select' && option.isAdd === true)
-      ) {
-        console.log('add addable option');
-        didChange = true;
-        options.push({
-          type: 'select',
-          id: config.additions.prefix + search,
-          label: config.additions.prefix + search,
-          selected: false,
-          active: false,
-          isAdd: true,
-          parent: null,
-        });
-      }
-    } else {
-      const addableOption = options.find((option) => option.type === 'select' && option.isAdd === true);
-      if (addableOption !== undefined) {
-        console.log('remove addable option');
-        didChange = true;
-        options.pop();
-      }
-    }
-    if (didChange) {
-      this.options.set(options);
-    }
-  }
+  // private updateAddableOption(search: string, config: SelectConfig = this.config) {
+  //   const options = get(this.allOptions);
+  //   let didChange = false;
+  //   if (config.additions) {
+  //     if (
+  //       search.length >= config.additions.minLength &&
+  //       !options.some((option) => option.type === 'select' && option.isAdd === true)
+  //     ) {
+  //       console.log('add addable option');
+  //       didChange = true;
+  //       options.push({
+  //         type: 'select',
+  //         id: config.additions.prefix + search,
+  //         label: config.additions.prefix + search,
+  //         selected: false,
+  //         active: false,
+  //         isAdd: true,
+  //         parent: null,
+  //         isMulti: false,
+  //       });
+  //     }
+  //   } else {
+  //     const addableOption = options.find((option) => option.type === 'select' && option.isAdd === true);
+  //     if (addableOption !== undefined) {
+  //       console.log('remove addable option');
+  //       didChange = true;
+  //       options.pop();
+  //     }
+  //   }
+  //   if (didChange) {
+  //     this.allOptions.set(options);
+  //   }
+  // }
 
   onKeyDown(event: KeyboardEvent) {
     if (get(this.isOpen)) {
       switch (event.code) {
         case 'Tab':
-          console.log('Prevent Tab');
           event.preventDefault();
           break;
       }
@@ -377,20 +454,16 @@ export class Select {
       const activeOption = this.getActiveLeaf();
 
       if (!activeOption) {
-        console.log('No active option');
         return;
       }
 
       switch (event.code) {
         case 'Escape':
-          console.log('Escape');
           this.close();
           break;
 
         case 'Enter':
-          console.log('Enter');
           if (activeOption.type === 'select') {
-            console.log('select', activeOption);
             this.selectOption(activeOption.id);
           } else {
             this.setChildActive();
@@ -398,32 +471,26 @@ export class Select {
           break;
 
         case 'ArrowDown':
-          console.log('ArrowDown');
           this.setNextActive();
           break;
 
         case 'ArrowUp':
-          console.log('ArrowUp');
           this.setPrevActive();
           break;
 
         case 'ArrowLeft':
-          console.log('ArrowLeft');
           this.setParentActive();
           break;
 
         case 'ArrowRight':
-          console.log('ArrowRight');
           this.setChildActive();
           break;
 
         case 'Tab':
           event.preventDefault();
           if (event.shiftKey) {
-            console.log('Tab shift');
             this.setPrevActive();
           } else {
-            console.log('Tab');
             this.setNextActive();
           }
           break;
@@ -432,6 +499,6 @@ export class Select {
   }
 }
 
-export function filterText(input: string, option: OptionItem) {
+export function filterText(option: OptionItem, input = '') {
   return option.label.toLowerCase().includes(input.toLowerCase());
 }
