@@ -1,12 +1,22 @@
-## Features
+# Svelte Headless Components
+
+[Go to demo](https://svelte-headless.adamnyberg.se)
+
+## Install
+
+```bash
+npm install -D @adamnyberg/svelte-headless-components
+```
+
+## Components
+
+### Select
 
 - Select
 - Multi select
+- Sub-menus
 - Search
-- Add option
+- Make addition
 - Keyboard shortcuts (Enter, Esc, Up, Down, Tab, Tab-Shift)
 
-Upcoming
-
-- 2nd level
-- - left or right
+The example component can be found at src/lib/demo/select.

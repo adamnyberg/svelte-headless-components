@@ -1,9 +1,12 @@
 <script lang="ts">
-  import type { Select, OptionSelect } from '$lib/components/select/select.js';
+  import type { OptionSelect, Select } from '$lib/components/select/select.js';
   import Item from './Item.svelte';
 
   export let select: Select;
   export let options: OptionSelect[];
+  let {
+    state: { search },
+  } = select;
 </script>
 
 {#each options as option}
@@ -12,9 +15,9 @@
       select.setActive(option);
     }}
     on:click={() => {
-      select.selectOption(option.id);
+      select.addOption(option.id);
     }}
   >
-    <Item {option} kind="search" />
+    <Item {option} kind="add" search={$search} />
   </button>
 {/each}

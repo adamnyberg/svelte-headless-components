@@ -11,7 +11,6 @@ type OptionBase = {
 export type OptionSelect = OptionBase & {
   type: 'select';
   selected: boolean;
-  isAdd: boolean;
   isMulti: boolean;
 };
 export type InputSelectOption = Partial<Omit<OptionSelect, 'label'>> & Pick<OptionSelect, 'label'>;
@@ -25,9 +24,20 @@ export type InputMenuOption = Partial<Omit<OptionMenu, 'label' | 'subOptions'>> 
   Pick<OptionMenu, 'label'> & { subOptions: InputOptionItem[] };
 
 export type CloseOnSelect = 'never' | 'always' | 'not_multi';
+
+export type Addition = {
+  id: string;
+  label: string;
+};
 export type SelectConfig = {
-  allowAdditions: boolean;
   closeOnSelect: CloseOnSelect;
+  minSearchLength: number;
+  additions: Addition[];
+};
+
+export type AddOption = {
+  id: string;
+  searchText: string;
 };
 
 export type OptionItem = OptionSelect | OptionMenu;
@@ -37,67 +47,70 @@ export type InputOptionItem = InputMenuOption | InputSelectOption;
 const searchOptionPrefix = 'search';
 
 export class Select {
-  readonly inputOptions: Writable<OptionItem[]>;
-  readonly filteredOptions: Writable<OptionItem[]>;
-  readonly searchOptions: Writable<OptionSelect[]>;
-  // readonly addOption: Writable<OptionSelect | null>;
-  readonly selected: Writable<OptionSelect[]>;
-  readonly onSelect: Writable<OptionSelect>;
-  readonly isOpen = writable(false);
-  search: Writable<string>;
+  input: Writable<InputOptionItem[]>;
   config: SelectConfig;
 
-  constructor(
-    inputOptions: InputOptionItem[],
-    config: SelectConfig = { allowAdditions: false, closeOnSelect: 'not_multi' },
-  ) {
+  readonly events = {
+    onSelect: writable<OptionSelect>(),
+    onAdd: writable<AddOption>(),
+  };
+
+  readonly state = {
+    isOpen: writable(false),
+    selected: writable<OptionSelect[]>(),
+    search: writable(''),
+    options: writable<OptionItem[]>(),
+    filteredOptions: writable<OptionItem[]>(),
+    searchOptions: writable<OptionSelect[]>([]),
+    additionOptions: writable<OptionSelect[]>([]),
+  };
+
+  constructor(inputOptions: InputOptionItem[], inputConfig: Partial<SelectConfig> = {}) {
+    const config = { ...{ additions: [], closeOnSelect: 'not_multi' as const, minSearchLength: 1 }, ...inputConfig };
     const options = inputOptions.map((option) => Select.inputToOptionItem(option));
 
-    const selectOptions = Select.toFlatSelect(options);
-
-    if (selectOptions.length === 0) {
-      throw new Error('Select must have at least one option');
-    }
-
-    this.onSelect = writable();
-
-    this.inputOptions = writable(options);
-    this.filteredOptions = writable(options);
-    this.searchOptions = writable([]);
+    this.input = writable(inputOptions);
     this.config = config;
 
-    this.selected = writable([]);
-    this.inputOptions.subscribe((options) => {
-      const newSelected = Select.toFlatSelect(options).filter((option) => option.selected);
-      this.selected.set(newSelected);
-      this.updateFilteredOptions(options);
-      // this.updateSearchOptions(options);
+    this.state.options = writable(options);
+    this.state.filteredOptions = writable(options);
+    this.state.selected = writable(Select.toFlatSelect(options).filter((option) => option.selected));
+
+    this.input.subscribe((inputOptions) => {
+      const options = inputOptions.map((option) => Select.inputToOptionItem(option));
+      this.state.options.set(options);
     });
 
-    this.search = writable('');
-    this.search.subscribe((search) => {
+    this.state.options.subscribe((options) => {
+      const newSelected = Select.toFlatSelect(options).filter((option) => option.selected);
+      this.state.selected.set(newSelected);
+
+      this.updateFilteredOptions(options);
+    });
+
+    this.state.search.subscribe((search) => {
       this.onSearchChange(search);
     });
   }
 
   open(): void {
-    const selected = get(this.selected);
+    const selected = get(this.state.selected);
     if (selected.length > 0) {
       this.setActive(selected[0]);
     } else {
       this.setFirstActive();
     }
-    this.isOpen.set(true);
+    this.state.isOpen.set(true);
   }
 
   close(): void {
-    this.search.set('');
+    this.state.search.set('');
     this.setActive(null);
-    this.isOpen.set(false);
+    this.state.isOpen.set(false);
   }
 
   toggleIsOpen(): void {
-    if (get(this.isOpen)) {
+    if (get(this.state.isOpen)) {
       this.close();
     } else {
       this.open();
@@ -115,7 +128,7 @@ export class Select {
     }
 
     if (!option.isMulti) {
-      const optionsFlat = Select.toFlat(get(this.inputOptions));
+      const optionsFlat = Select.toFlat(get(this.state.options));
       for (const o of optionsFlat) {
         if (o.type === 'select') {
           o.selected = false;
@@ -133,21 +146,30 @@ export class Select {
 
     option.selected = option.isMulti ? !option.selected : true;
 
-    this.inputOptions.set(get(this.inputOptions));
+    this.state.options.set(get(this.state.options));
     this.updateSearchOptions();
 
-    this.onSelect.set(option);
+    this.events.onSelect.set(option);
 
-    const closeOnSelect = this.config.closeOnSelect;
-    if (closeOnSelect === 'always' || (!option.isMulti && closeOnSelect === 'not_multi')) {
+    if (this.shouldClose(option)) {
       this.close();
     }
 
     return option;
   }
 
+  addOption(id: string) {
+    const option = this.getSelectOption(id);
+    if (option === null) {
+      return null;
+    }
+
+    this.events.onAdd.set({ id: option.id, searchText: get(this.state.search) });
+    this.state.search.set('');
+  }
+
   getMenuOptions(): OptionMenu[] {
-    return Select.toFlat(get(this.inputOptions)).filter((option) => option.type === 'menu') as OptionMenu[];
+    return Select.toFlat(get(this.state.options)).filter((option) => option.type === 'menu') as OptionMenu[];
   }
 
   getOption(id: string): OptionItem | null {
@@ -176,10 +198,12 @@ export class Select {
   }
 
   setActive(setOption: OptionItem | null): void {
-    const optionsFlat = Select.toFlat(get(this.inputOptions));
-    const searchOptions = get(this.searchOptions);
+    const optionsFlat = Select.toFlat(get(this.state.options));
+    const filteredOptions = get(this.state.filteredOptions);
+    const searchOptions = get(this.state.searchOptions);
+    const addOptions = get(this.state.additionOptions);
 
-    for (const option of [...optionsFlat, ...searchOptions]) {
+    for (const option of [...optionsFlat, ...searchOptions, ...addOptions]) {
       if (setOption && setOption.id === option.id) {
         option.active = true;
       } else {
@@ -195,9 +219,10 @@ export class Select {
       }
     }
 
-    this.inputOptions.set(get(this.inputOptions));
-    this.searchOptions.set(get(this.searchOptions));
-    const active = this.getActiveLeaf();
+    this.state.options.set(get(this.state.options));
+    this.state.filteredOptions.set(filteredOptions);
+    this.state.searchOptions.set(get(this.state.searchOptions));
+    this.state.additionOptions.set(get(this.state.additionOptions));
   }
 
   setPrevActive(): void {
@@ -256,18 +281,22 @@ export class Select {
   }
 
   private onSearchChange(search: string) {
-    if (this.config.allowAdditions) {
-      // this.updateAddableOption(search);
+    if (this.config.additions.length > 0) {
+      this.updateAddableOption(search);
     }
-    const options = get(this.inputOptions);
+    const options = get(this.state.options);
 
-    const filtered = options.filter((option) => filterText(option, search));
-    const subSelectOptions = Select.toFlatSelect(options)
-      .filter((o) => o.parent !== null && filterText(o, search))
-      .map(Select.toSearchOption);
-
-    this.filteredOptions.set(filtered);
-    this.searchOptions.set(subSelectOptions);
+    if (search.length >= this.config.minSearchLength) {
+      const filtered = options.filter((option) => filterText(option, search));
+      const subSelectOptions = Select.toFlatSelect(options)
+        .filter((o) => o.parent !== null && filterText(o, search))
+        .map(Select.toSearchOption);
+      this.state.filteredOptions.set(filtered);
+      this.state.searchOptions.set(subSelectOptions);
+    } else {
+      this.state.filteredOptions.set(options);
+      this.state.searchOptions.set([]);
+    }
 
     this.setFirstActive();
   }
@@ -277,17 +306,24 @@ export class Select {
   }
 
   private updateFilteredOptions(options: OptionItem[]) {
-    const search = get(this.search);
-    const filtered = options.filter((option) => filterText(option, search));
-    this.filteredOptions.set(filtered);
+    const search = get(this.state.search);
+    if (search === undefined || search.length < this.config.minSearchLength) {
+      this.state.filteredOptions.set(options);
+      return;
+    }
+
+    const filtered = options.filter(
+      (option) => search && search.length >= this.config.minSearchLength && filterText(option, search),
+    );
+    this.state.filteredOptions.set(filtered);
   }
 
   private updateSearchOptions() {
-    const search = get(this.search);
+    const search = get(this.state.search);
     const active = this.getActiveLeaf();
 
     const subSelectOptions = [];
-    for (const option of Select.toFlatSelect(get(this.inputOptions))) {
+    for (const option of Select.toFlatSelect(get(this.state.options))) {
       if (option.parent !== null && filterText(option, search)) {
         const newOption = Select.toSearchOption(option);
         if (active?.id === newOption.id) {
@@ -296,7 +332,7 @@ export class Select {
         subSelectOptions.push(newOption);
       }
     }
-    this.searchOptions.set(subSelectOptions);
+    this.state.searchOptions.set(subSelectOptions);
   }
 
   static toFlat(options: OptionItem[]): OptionItem[] {
@@ -329,29 +365,32 @@ export class Select {
       return option.parent.subOptions;
     }
 
-    if (get(this.search).length > 0) {
+    if (get(this.state.search).length >= this.config.minSearchLength) {
       return this.getShowingSearchOptions();
     }
 
-    return get(this.filteredOptions);
+    return get(this.state.filteredOptions);
   }
 
   private setFirstActive() {
-    const filteredOptions = get(this.filteredOptions);
-    const searchOptions = get(this.searchOptions);
+    const filteredOptions = get(this.state.filteredOptions);
+    const searchOptions = get(this.state.searchOptions);
+    const addOptions = get(this.state.additionOptions);
     if (filteredOptions.length > 0) {
       this.setActive(filteredOptions[0]);
     } else if (searchOptions.length > 0) {
       this.setActive(searchOptions[0]);
+    } else if (addOptions.length > 0) {
+      this.setActive(addOptions[0]);
     }
   }
 
   private getAllOptions(): OptionItem[] {
-    return [...get(this.inputOptions), ...get(this.searchOptions)];
+    return [...get(this.state.options), ...get(this.state.searchOptions), ...get(this.state.additionOptions)];
   }
 
   private getShowingSearchOptions(): OptionItem[] {
-    return [...get(this.filteredOptions), ...get(this.searchOptions)];
+    return [...get(this.state.filteredOptions), ...get(this.state.searchOptions), ...get(this.state.additionOptions)];
   }
 
   private static toSearchOption(option: OptionSelect): OptionSelect {
@@ -361,7 +400,12 @@ export class Select {
     };
   }
 
-  private static inputToOptionItem(input: InputOptionItem, parent?: OptionItem): OptionItem {
+  private shouldClose(option: OptionSelect): boolean {
+    const closeOnSelect = this.config.closeOnSelect;
+    return closeOnSelect === 'always' || (!option.isMulti && closeOnSelect === 'not_multi');
+  }
+
+  static inputToOptionItem(input: InputOptionItem, parent?: OptionItem): OptionItem {
     input.type = input.type ?? 'select';
     switch (input.type) {
       case 'select':
@@ -371,7 +415,6 @@ export class Select {
             id: input.label,
             selected: false,
             active: false,
-            isAdd: false,
             parent: parent ?? null,
             isMulti: false,
           },
@@ -405,42 +448,26 @@ export class Select {
     }
   }
 
-  // private updateAddableOption(search: string, config: SelectConfig = this.config) {
-  //   const options = get(this.allOptions);
-  //   let didChange = false;
-  //   if (config.additions) {
-  //     if (
-  //       search.length >= config.additions.minLength &&
-  //       !options.some((option) => option.type === 'select' && option.isAdd === true)
-  //     ) {
-  //       console.log('add addable option');
-  //       didChange = true;
-  //       options.push({
-  //         type: 'select',
-  //         id: config.additions.prefix + search,
-  //         label: config.additions.prefix + search,
-  //         selected: false,
-  //         active: false,
-  //         isAdd: true,
-  //         parent: null,
-  //         isMulti: false,
-  //       });
-  //     }
-  //   } else {
-  //     const addableOption = options.find((option) => option.type === 'select' && option.isAdd === true);
-  //     if (addableOption !== undefined) {
-  //       console.log('remove addable option');
-  //       didChange = true;
-  //       options.pop();
-  //     }
-  //   }
-  //   if (didChange) {
-  //     this.allOptions.set(options);
-  //   }
-  // }
+  private updateAddableOption(search: string) {
+    const addOptions = [];
+    if (search.length >= this.config.minSearchLength) {
+      for (const addition of this.config.additions) {
+        addOptions.push({
+          id: addition.id,
+          label: addition.label,
+          active: false,
+          parent: null,
+          selected: false,
+          isMulti: false,
+          type: 'select' as const,
+        });
+      }
+    }
+    this.state.additionOptions.set(addOptions);
+  }
 
   onKeyDown(event: KeyboardEvent) {
-    if (get(this.isOpen)) {
+    if (get(this.state.isOpen)) {
       switch (event.code) {
         case 'Tab':
           event.preventDefault();
@@ -450,7 +477,7 @@ export class Select {
   }
 
   onKeyUp(event: KeyboardEvent) {
-    if (get(this.isOpen)) {
+    if (get(this.state.isOpen)) {
       const activeOption = this.getActiveLeaf();
 
       if (!activeOption) {
@@ -464,7 +491,13 @@ export class Select {
 
         case 'Enter':
           if (activeOption.type === 'select') {
-            this.selectOption(activeOption.id);
+            const addOptions = get(this.state.additionOptions);
+            const isActiveAdd = addOptions.some((option) => option.id === activeOption.id);
+            if (isActiveAdd) {
+              this.addOption(activeOption.id);
+            } else {
+              this.selectOption(activeOption.id);
+            }
           } else {
             this.setChildActive();
           }

@@ -1,9 +1,10 @@
 {
   "name": "svelte-headless-components",
   "version": "0.0.1",
+  "license": "MIT",
   "scripts": {
     "dev": "vite dev",
-    "build": "vite build && npm run package",
+    "build": "vite build",
     "preview": "vite preview",
     "package": "svelte-kit sync && svelte-package && publint",
     "prepublishOnly": "npm run package",
@@ -32,7 +33,10 @@
   "devDependencies": {
     "@floating-ui/core": "^1.5.0",
     "@playwright/test": "^1.28.1",
-    "@sveltejs/adapter-auto": "^2.0.0",
+    "@skeletonlabs/skeleton": "^2.5.1",
+    "@steeze-ui/heroicons": "^2.2.3",
+    "@steeze-ui/svelte-icon": "^1.5.0",
+    "@sveltejs/adapter-static": "^2.0.3",
     "@sveltejs/kit": "^1.20.4",
     "@sveltejs/package": "^2.0.0",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
@@ -41,6 +45,7 @@
     "eslint": "^8.28.0",
     "eslint-config-prettier": "^8.5.0",
     "eslint-plugin-svelte": "^2.30.0",
+    "highlight.js": "^11.9.0",
     "postcss": "^8.4.31",
     "prettier": "^2.8.0",
     "prettier-plugin-svelte": "^2.10.1",
