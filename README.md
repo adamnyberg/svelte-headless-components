@@ -5,7 +5,7 @@
 ## Install
 
 ```bash
-npm install -D @adamnyberg/svelte-headless-components
+npm install -D svelte-headless-components
 ```
 
 ## Components

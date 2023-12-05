@@ -1,7 +1,17 @@
 {
   "name": "svelte-headless-components",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "license": "MIT",
+  "keywords": [
+    "svelte",
+    "svelte component",
+    "select",
+    "dropdown",
+    "multi select",
+    "searchable select",
+    "keyboard navigation",
+    "headless"
+  ],
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
