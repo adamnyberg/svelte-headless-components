@@ -9,29 +9,24 @@ const [floatingRef, floatingContent] = createFloatingActions({
   middleware: [offset(4)],
 });
 
-const select = new Select([
-  { label: '⚫️ Backlog' },
-  { label: '🔵 In progress' },
-  { label: '🟢 Done' }]);
 const {
   state: { isOpen, selected, filteredOptions },
   elements: { trigger, content, options },
-} = select;
+} = new Select([
+  { label: '⚫️ Backlog' },
+  { label: '🔵 In progress' },
+  { label: '🟢 Done' }
+]);
 </script>
 
-<div class="w-fit">
 <button
   use:floatingRef
   use:element={trigger}
-  class="border {$isOpen
+  class="w-fit border {$isOpen
     ? 'border-slate-500'
     : 'border-slate-300'} flex items-center gap-2 focus:outline-none focus:border-sky-600 hover:border hover:border-slate-400 rounded-md px-2 py-1"
 >
-  {#if $selected.length === 0}
-    <span class="text-slate-500">Nothing selected</span>
-  {:else}
-    <span class="text-slate-900">{$selected[0].label}</span>
-  {/if}
+  <span class="text-slate-600">{$selected.length > 0 ? $selected[0].label : 'Nothing selected'}</span>
 </button>
 
 {#if $isOpen}
@@ -52,5 +47,4 @@ const {
     </div>
   </div>
 {/if}
-</div>
 `;
