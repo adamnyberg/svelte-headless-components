@@ -1,10 +1,10 @@
 <script lang="ts">
   import { Select, type InputOptionItem } from '$lib/components/select/select.js';
   import Example from '$lib/demo/Example.svelte';
-  import { ChartBar, ChartPie } from '@steeze-ui/heroicons';
+  import { ChartBar, ChartPie, PresentationChartLine } from '@steeze-ui/heroicons';
   import Svelect from '$lib/demo/select/Svelect.svelte';
   import { get } from 'svelte/store';
-  import { CodeBlock } from '@skeletonlabs/skeleton';
+  import SimpleSelect from '$lib/demo/select/SimpleSelect.svelte';
 
   const options: InputOptionItem[] = [
     { label: 'Yellow bug' },
@@ -84,6 +84,7 @@
     new Select([
       { label: 'Bar chart', isMulti: true, data: { icon: ChartBar } },
       { label: 'Pie chart', isMulti: true, data: { icon: ChartPie } },
+      { label: 'Line chart', isMulti: true, data: { icon: PresentationChartLine } },
     ]),
     new Select(structuredClone(options), config),
   ];
@@ -97,25 +98,6 @@
     </h1>
     <div class="flex flex-col gap-4">
       <p>Basic usage is to create an instance of the Select class and then use the exposed props to build your UI.</p>
-      <CodeBlock
-        class="text-sm rounded-md p-4 border border-slate-300"
-        language="ts"
-        code={`
-const select = new Select([
-  { label: 'Bar chart'},
-  { label: 'Pie chart'},
-]);
-
-let {
-  state: { 
-    isOpen, search, selected, 
-    filteredOptions, searchOptions, additionOptions 
-  },
-  events: { onSelect, onAdd },
-  config,
-} = select;
-`}
-      />
       <p>
         The library is completely unstyled and you're free to structure your HTML however you want. Feel free to take
         inspiration from the <a
@@ -125,6 +107,9 @@ let {
         > I created at .
       </p>
     </div>
+
+    <SimpleSelect />
+    <hr />
 
     <Example select={selects[2]} showSearch>All options with sub menus</Example>
     <Example select={selects[0]}>Select</Example>
@@ -137,8 +122,8 @@ let {
         inputPlaceholder="Search or add..."
         on:add={({ detail }) => {
           const newOption = Select.inputToOptionItem({ label: detail.searchText, isMulti: true, selected: true });
-          const newOptions = [...get(multiWithAdd.input), newOption];
-          multiWithAdd.input.set(newOptions);
+          const newOptions = [...get(multiWithAdd.inputOptions), newOption];
+          multiWithAdd.inputOptions.set(newOptions);
           multiWithAdd.setActive(newOption);
         }}
       />

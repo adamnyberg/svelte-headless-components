@@ -1,3 +1,5 @@
+import { browser } from '$app/environment';
+import type { Action } from 'svelte/action';
 import { get, writable, type Writable } from 'svelte/store';
 
 type OptionBase = {
@@ -44,11 +46,41 @@ export type OptionItem = OptionSelect | OptionMenu;
 
 export type InputOptionItem = InputMenuOption | InputSelectOption;
 
+export type WritableElement = Writable<HTMLElement | null>;
+export type WritableOptions = [Writable<HTMLElement[]>, string];
+
 const searchOptionPrefix = 'search';
 
+export const element: Action<HTMLElement, WritableElement | WritableOptions> = (node, input) => {
+  if (Array.isArray(input)) {
+    const [writableOptions, optionId] = input;
+    node.dataset.id = optionId;
+    writableOptions.set([...get(writableOptions), node]);
+    return {
+      destroy() {
+        writableOptions.set(get(writableOptions).filter((e) => e !== node));
+      },
+    };
+  } else {
+    input.set(node);
+    return {
+      destroy() {
+        input.set(null);
+      },
+    };
+  }
+};
+
 export class Select {
-  input: Writable<InputOptionItem[]>;
+  inputOptions: Writable<InputOptionItem[]>;
   config: SelectConfig;
+
+  readonly elements = {
+    trigger: writable<HTMLElement | null>(null),
+    content: writable<HTMLElement | null>(null),
+    search: writable<HTMLInputElement | null>(null),
+    options: writable<HTMLElement[]>([]),
+  };
 
   readonly events = {
     onSelect: writable<OptionSelect>(),
@@ -69,14 +101,14 @@ export class Select {
     const config = { ...{ additions: [], closeOnSelect: 'not_multi' as const, minSearchLength: 1 }, ...inputConfig };
     const options = inputOptions.map((option) => Select.inputToOptionItem(option));
 
-    this.input = writable(inputOptions);
+    this.inputOptions = writable(inputOptions);
     this.config = config;
 
     this.state.options = writable(options);
     this.state.filteredOptions = writable(options);
     this.state.selected = writable(Select.toFlatSelect(options).filter((option) => option.selected));
 
-    this.input.subscribe((inputOptions) => {
+    this.inputOptions.subscribe((inputOptions) => {
       const options = inputOptions.map((option) => Select.inputToOptionItem(option));
       this.state.options.set(options);
     });
@@ -91,6 +123,53 @@ export class Select {
     this.state.search.subscribe((search) => {
       this.onSearchChange(search);
     });
+
+    this.elements.trigger.subscribe((trigger) => {
+      if (trigger) {
+        trigger.addEventListener('mouseup', () => {
+          this.toggleIsOpen();
+        });
+      }
+    });
+
+    this.elements.content.subscribe(() => {
+      this.clickOutside();
+    });
+
+    this.elements.search.subscribe((search) => {
+      if (search) {
+        search.focus();
+        search.addEventListener('input', (e) => {
+          this.state.search.set((e.target as HTMLInputElement).value);
+        });
+      }
+    });
+
+    this.elements.options.subscribe((options) => {
+      for (const option of options) {
+        if (option.dataset.clickEvent === 'true') {
+          continue;
+        }
+        option.dataset.clickEvent = 'true';
+        option.addEventListener('click', (e) => {
+          const id = option.dataset.id ?? '';
+          if (this.isAddOptionId(id)) {
+            this.addOption(id);
+          } else {
+            this.selectOption(id);
+          }
+        });
+
+        option.addEventListener('mouseenter', () => {
+          this.setActiveId(option.dataset.id ?? '');
+        });
+      }
+    });
+
+    if (browser) {
+      document.addEventListener('keydown', (e) => this.onKeyDown(e));
+      document.addEventListener('keyup', (e) => this.onKeyUp(e));
+    }
   }
 
   open(): void {
@@ -101,12 +180,14 @@ export class Select {
       this.setFirstActive();
     }
     this.state.isOpen.set(true);
+    get(this.elements.trigger)?.blur();
   }
 
   close(): void {
     this.state.search.set('');
     this.setActive(null);
     this.state.isOpen.set(false);
+    get(this.elements.trigger)?.focus();
   }
 
   toggleIsOpen(): void {
@@ -195,6 +276,11 @@ export class Select {
 
   getActiveList(): OptionItem[] {
     return Select.toFlat(this.getAllOptions()).filter((option) => option.active);
+  }
+
+  setActiveId(id: string | null): void {
+    const option = this.getOption(id ?? '');
+    this.setActive(option);
   }
 
   setActive(setOption: OptionItem | null): void {
@@ -303,6 +389,11 @@ export class Select {
 
   private isSearchOptionId(id: string): boolean {
     return id.startsWith(searchOptionPrefix);
+  }
+
+  private isAddOptionId(id: string): boolean {
+    const option = get(this.state.additionOptions).find((option) => option.id === id);
+    return option !== undefined;
   }
 
   private updateFilteredOptions(options: OptionItem[]) {
@@ -477,6 +568,12 @@ export class Select {
   }
 
   onKeyUp(event: KeyboardEvent) {
+    const isOpen = get(this.state.isOpen);
+    if (!isOpen && event.code === 'Enter' && document.activeElement === get(this.elements.trigger)) {
+      this.open();
+      return;
+    }
+
     if (get(this.state.isOpen)) {
       const activeOption = this.getActiveLeaf();
 
@@ -528,6 +625,23 @@ export class Select {
           }
           break;
       }
+    }
+  }
+
+  private clickOutside() {
+    const content = get(this.elements.content);
+    if (content) {
+      document.addEventListener('click', (e) => {
+        if (
+          content &&
+          !content.contains(e.target as HTMLElement) &&
+          !e.defaultPrevented &&
+          get(this.state.isOpen) &&
+          !get(this.elements.trigger)?.contains(e.target as HTMLElement)
+        ) {
+          this.close();
+        }
+      });
     }
   }
 }
