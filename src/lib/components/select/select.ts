@@ -514,10 +514,6 @@ export class Select {
         return withDefaults;
 
       case 'menu':
-        if (input.subOptions === undefined) {
-          throw new Error('subOptions is required for menu type');
-        }
-
         const menuOption = {
           ...{
             type: 'menu',
