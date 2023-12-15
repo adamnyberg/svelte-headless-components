@@ -1,4 +1,4 @@
-import { browser } from '$app/environment';
+import { BROWSER } from 'esm-env';
 import type { Action } from 'svelte/action';
 import { get, writable, type Writable } from 'svelte/store';
 
@@ -166,7 +166,7 @@ export class Select {
       }
     });
 
-    if (browser) {
+    if (BROWSER) {
       document.addEventListener('keydown', (e) => this.onKeyDown(e));
       document.addEventListener('keyup', (e) => this.onKeyUp(e));
     }

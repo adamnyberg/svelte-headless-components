@@ -1,6 +1,6 @@
 {
   "name": "svelte-headless-components",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "license": "MIT",
   "keywords": [
     "svelte",
@@ -29,7 +29,7 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "svelte": "./dist/index.js"
+      "default": "./dist/index.js"
     }
   },
   "files": [
@@ -72,6 +72,7 @@
   "types": "./dist/index.d.ts",
   "type": "module",
   "dependencies": {
-    "@paralleldrive/cuid2": "^2.2.2"
+    "@paralleldrive/cuid2": "^2.2.2",
+    "esm-env": "^1.0.0"
   }
 }
