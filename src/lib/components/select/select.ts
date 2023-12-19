@@ -87,6 +87,7 @@ export class Select {
 
   readonly events = {
     onSelect: writable<OptionSelect>(),
+    onChange: writable<OptionSelect>(),
     onAdd: writable<AddOption>(),
   };
 
@@ -199,6 +200,7 @@ export class Select {
     if (option === null) {
       return null;
     }
+    const previousSelected = option.selected ? true : false;
 
     if (!option.isMulti) {
       const optionsFlat = Select.toFlat(get(this.state.options));
@@ -223,6 +225,9 @@ export class Select {
     this.updateSearchOptions();
 
     this.events.onSelect.set(option);
+    if (option.selected !== previousSelected) {
+      this.events.onChange.set(option);
+    }
 
     if (this.shouldClose(option)) {
       this.state.isOpen.set(false);

@@ -9,5 +9,15 @@
 
 <div>
   <h2 class="text-xl"><slot /></h2>
-  <Svelect {select} {showSearch} {inputPlaceholder} />
+  <Svelect
+    {select}
+    {showSearch}
+    {inputPlaceholder}
+    on:select={({ detail }) => {
+      console.log('on:select', detail);
+    }}
+    on:change={({ detail }) => {
+      console.log('on:change', detail);
+    }}
+  />
 </div>

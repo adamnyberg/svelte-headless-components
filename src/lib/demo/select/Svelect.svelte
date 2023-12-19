@@ -6,7 +6,13 @@
   import { ChevronUpDown } from '@steeze-ui/heroicons';
   import Item from './Item.svelte';
 
-  const dispatch = createEventDispatcher<{ select: OptionItem; add: AddOption; open: void; close: void }>();
+  const dispatch = createEventDispatcher<{
+    select: OptionItem;
+    change: OptionItem;
+    add: AddOption;
+    open: void;
+    close: void;
+  }>();
 
   export let select: Select;
   export let showSearch = false;
@@ -14,7 +20,7 @@
 
   let {
     state: { isOpen, search, selected, filteredOptions, searchOptions, additionOptions },
-    events: { onSelect, onAdd },
+    events: { onSelect, onChange, onAdd },
     elements: { search: searchElement, trigger, content },
     config,
   } = select;
@@ -27,6 +33,10 @@
 
   $: if ($onSelect) {
     dispatch('select', $onSelect);
+  }
+
+  $: if ($onChange) {
+    dispatch('change', $onChange);
   }
 
   $: if ($onAdd) {
