@@ -1,6 +1,8 @@
 import { BROWSER } from 'esm-env';
+import type { ComputeConfig } from 'svelte-floating-ui';
 import type { Action } from 'svelte/action';
 import { get, writable, type Writable } from 'svelte/store';
+import { createPopover } from '../popover/popover.js';
 
 type OptionBase = {
   id: string;
@@ -15,14 +17,14 @@ export type OptionSelect = OptionBase & {
   selected: boolean;
   isMulti: boolean;
 };
-export type InputSelectOption = Partial<Omit<OptionSelect, 'label'>> & Pick<OptionSelect, 'label'>;
+export type InputOptionSelect = Partial<Omit<OptionSelect, 'label'>> & Pick<OptionSelect, 'label'>;
 
 export type OptionMenu = OptionBase & {
   type: 'menu';
   hasSelected: boolean;
   subOptions: OptionItem[];
 };
-export type InputMenuOption = Partial<Omit<OptionMenu, 'label' | 'subOptions'>> &
+export type InputOptionMenu = Partial<Omit<OptionMenu, 'label' | 'subOptions'>> &
   Pick<OptionMenu, 'label'> & { subOptions: InputOptionItem[] };
 
 export type CloseOnSelect = 'never' | 'always' | 'not_multi';
@@ -35,6 +37,7 @@ export type SelectConfig = {
   closeOnSelect: CloseOnSelect;
   minSearchLength: number;
   additions: Addition[];
+  floatingUiOptions?: Partial<ComputeConfig>;
 };
 
 export type AddOption = {
@@ -44,7 +47,7 @@ export type AddOption = {
 
 export type OptionItem = OptionSelect | OptionMenu;
 
-export type InputOptionItem = InputMenuOption | InputSelectOption;
+export type InputOptionItem = InputOptionMenu | InputOptionSelect;
 
 export type WritableElement = Writable<HTMLElement | null>;
 export type WritableOptions = [Writable<HTMLElement[]>, string];
@@ -76,10 +79,10 @@ export class Select {
   config: SelectConfig;
 
   readonly elements = {
-    trigger: writable<HTMLElement | null>(null),
-    content: writable<HTMLElement | null>(null),
     search: writable<HTMLInputElement | null>(null),
     options: writable<HTMLElement[]>([]),
+    trigger: writable<HTMLElement | null>(null),
+    content: writable<HTMLElement | null>(null),
   };
 
   readonly events = {
@@ -120,20 +123,16 @@ export class Select {
       this.updateFilteredOptions(options);
     });
 
-    this.state.search.subscribe((search) => {
-      this.onSearchChange(search);
-    });
-
-    this.elements.trigger.subscribe((trigger) => {
-      if (trigger) {
-        trigger.addEventListener('mouseup', () => {
-          this.toggleIsOpen();
-        });
+    this.state.isOpen.subscribe((isOpen) => {
+      if (isOpen) {
+        this.open();
+      } else {
+        this.close();
       }
     });
 
-    this.elements.content.subscribe(() => {
-      this.clickOutside();
+    this.state.search.subscribe((search) => {
+      this.onSearchChange(search);
     });
 
     this.elements.search.subscribe((search) => {
@@ -147,11 +146,12 @@ export class Select {
 
     this.elements.options.subscribe((options) => {
       for (const option of options) {
-        if (option.dataset.clickEvent === 'true') {
+        if (option.dataset.eventListenersAdded === 'true') {
           continue;
         }
-        option.dataset.clickEvent = 'true';
-        option.addEventListener('click', (e) => {
+        option.dataset.eventListenersAdded = 'true';
+
+        option.addEventListener('mouseup', () => {
           const id = option.dataset.id ?? '';
           if (this.isAddOptionId(id)) {
             this.addOption(id);
@@ -166,36 +166,28 @@ export class Select {
       }
     });
 
+    this.setUpFloatingUi(config.floatingUiOptions);
+
     if (BROWSER) {
       document.addEventListener('keydown', (e) => this.onKeyDown(e));
       document.addEventListener('keyup', (e) => this.onKeyUp(e));
     }
   }
 
-  open(): void {
+  private open(): void {
     const selected = get(this.state.selected);
     if (selected.length > 0) {
       this.setActive(selected[0]);
     } else {
       this.setFirstActive();
     }
-    this.state.isOpen.set(true);
     get(this.elements.trigger)?.blur();
   }
 
-  close(): void {
+  private close(): void {
     this.state.search.set('');
     this.setActive(null);
-    this.state.isOpen.set(false);
     get(this.elements.trigger)?.focus();
-  }
-
-  toggleIsOpen(): void {
-    if (get(this.state.isOpen)) {
-      this.close();
-    } else {
-      this.open();
-    }
   }
 
   selectOption(id: string): OptionSelect | null {
@@ -233,7 +225,7 @@ export class Select {
     this.events.onSelect.set(option);
 
     if (this.shouldClose(option)) {
-      this.close();
+      this.state.isOpen.set(false);
     }
 
     return option;
@@ -246,7 +238,7 @@ export class Select {
     }
 
     this.events.onAdd.set({ id: option.id, searchText: get(this.state.search) });
-    this.state.search.set('');
+    this.resetSearch();
   }
 
   getMenuOptions(): OptionMenu[] {
@@ -364,6 +356,14 @@ export class Select {
       const first = active.subOptions[0];
       this.setActive(first);
     }
+  }
+
+  resetSearch() {
+    const searchElement = get(this.elements.search);
+    if (searchElement) {
+      searchElement.value = '';
+    }
+    this.state.search.set('');
   }
 
   private onSearchChange(search: string) {
@@ -553,10 +553,22 @@ export class Select {
     this.state.additionOptions.set(addOptions);
   }
 
+  onTriggerMouseUp(event: MouseEvent, isOpen: Writable<boolean>) {
+    if (event.target === get(this.elements.trigger)) {
+      if (isOpen) {
+        this.state.isOpen.set(false);
+      } else {
+        this.state.isOpen.set(true);
+      }
+    }
+  }
+
   onKeyDown(event: KeyboardEvent) {
     if (get(this.state.isOpen)) {
       switch (event.code) {
         case 'Tab':
+        case 'ArrowDown':
+        case 'ArrowUp':
           event.preventDefault();
           break;
       }
@@ -566,11 +578,11 @@ export class Select {
   onKeyUp(event: KeyboardEvent) {
     const isOpen = get(this.state.isOpen);
     if (!isOpen && event.code === 'Enter' && document.activeElement === get(this.elements.trigger)) {
-      this.open();
+      this.state.isOpen.set(true);
       return;
     }
 
-    if (get(this.state.isOpen)) {
+    if (isOpen) {
       const activeOption = this.getActiveLeaf();
 
       if (!activeOption) {
@@ -579,7 +591,7 @@ export class Select {
 
       switch (event.code) {
         case 'Escape':
-          this.close();
+          this.state.isOpen.set(false);
           break;
 
         case 'Enter':
@@ -624,21 +636,22 @@ export class Select {
     }
   }
 
-  private clickOutside() {
-    const content = get(this.elements.content);
-    if (content) {
-      document.addEventListener('click', (e) => {
-        if (
-          content &&
-          !content.contains(e.target as HTMLElement) &&
-          !e.defaultPrevented &&
-          get(this.state.isOpen) &&
-          !get(this.elements.trigger)?.contains(e.target as HTMLElement)
-        ) {
-          this.close();
-        }
-      });
-    }
+  private setUpFloatingUi(config: Partial<ComputeConfig> = {}) {
+    const isOpen = this.state.isOpen;
+    const [floatingTrigger, floatingContent] = createPopover(isOpen, {
+      floatingUi: config,
+    });
+    this.elements.trigger.subscribe((node) => {
+      if (node) {
+        floatingTrigger(node);
+      }
+    });
+    this.elements.content.subscribe((node) => {
+      if (node) {
+        floatingContent(node);
+        node.focus();
+      }
+    });
   }
 }
 

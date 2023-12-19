@@ -1,8 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import { element, type AddOption, type OptionItem, type Select } from '$lib/components/select/select.js';
-  import { offset } from 'svelte-floating-ui/dom';
-  import { createFloatingActions } from 'svelte-floating-ui';
   import Options from '$lib/demo/select/Options.svelte';
   import { Icon } from '@steeze-ui/svelte-icon';
   import { ChevronUpDown } from '@steeze-ui/heroicons';
@@ -14,16 +12,10 @@
   export let showSearch = false;
   export let inputPlaceholder = 'Search...';
 
-  const [floatingRef, floatingContent] = createFloatingActions({
-    strategy: 'absolute',
-    placement: 'bottom-start',
-    middleware: [offset(4)],
-  });
-
   let {
     state: { isOpen, search, selected, filteredOptions, searchOptions, additionOptions },
     events: { onSelect, onAdd },
-    elements: { trigger, content, search: searchElement },
+    elements: { search: searchElement, trigger, content },
     config,
   } = select;
 
@@ -44,7 +36,6 @@
 
 <div class="w-fit">
   <button
-    use:floatingRef
     use:element={trigger}
     class="border {$isOpen
       ? 'border-slate-500'
@@ -67,11 +58,7 @@
   </button>
 
   {#if $isOpen}
-    <div
-      class="flex flex-col divide-y bg-white border border-slate-300 rounded shadow-md pb-1"
-      use:floatingContent
-      use:element={content}
-    >
+    <div class="flex flex-col divide-y bg-white border border-slate-300 rounded shadow-md pb-1" use:element={content}>
       {#if showSearch || select.config.additions.length > 0}
         <input
           type="text"

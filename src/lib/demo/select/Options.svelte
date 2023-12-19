@@ -50,7 +50,7 @@
       <svelte:self {select} options={option.subOptions} />
     </div>
   {:else}
-    <button use:element={[select.elements.options, option.id]}>
+    <button use:element={[select.elements.options, option.id]} class="outline-none">
       <Item {option} />
     </button>
   {/if}

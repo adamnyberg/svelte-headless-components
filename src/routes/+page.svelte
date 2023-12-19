@@ -91,7 +91,7 @@
 </script>
 
 <div class="flex justify-center">
-  <div class="flex flex-col max-w-2xl gap-12 mt-12 px-4 mb-40">
+  <div class="flex flex-col max-w-4xl gap-12 mt-12 px-4 mb-40">
     <h1 class="text-3xl flex justify-between items-center">
       <span>Svelte Headless Select Demo</span>
       <a href="https://github.com/adamnyberg/svelte-headless-components" class="text-sm text-slate-500">Github</a>
@@ -122,7 +122,7 @@
         inputPlaceholder="Search or add..."
         on:add={({ detail }) => {
           const newOption = Select.inputToOptionItem({ label: detail.searchText, isMulti: true, selected: true });
-          const newOptions = [...get(multiWithAdd.inputOptions), newOption];
+          const newOptions = [...get(multiWithAdd.state.options), newOption];
           multiWithAdd.inputOptions.set(newOptions);
           multiWithAdd.setActive(newOption);
         }}

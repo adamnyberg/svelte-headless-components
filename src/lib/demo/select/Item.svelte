@@ -18,6 +18,7 @@
       <input
         type="checkbox"
         bind:checked={option.selected}
+        on:click|preventDefault={() => {}}
         class="focus:border-indigo-500 accent-indigo-500 checked:bg-indigo-500 checked:focus:bg-indigo-500 hover:checked:bg-indigo-500 rounded border border-slate-600 bg-transparent focus:ring-transparent hover:cursor-pointer"
       />
     {/if}
