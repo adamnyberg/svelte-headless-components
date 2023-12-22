@@ -13,7 +13,6 @@ function setUpBackdrop() {
     node.style.width = '100vw';
     node.style.height = '100vh';
     node.style.display = 'none';
-    document.body.prepend(node);
 
     backdropNode.set(node);
     return node;
