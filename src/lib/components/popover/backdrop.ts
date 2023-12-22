@@ -13,7 +13,6 @@ function setUpBackdrop() {
     node.style.width = '100vw';
     node.style.height = '100vh';
     node.style.display = 'none';
-    node.style.backgroundColor = 'rgba(0, 0, 0, 0.1)';
     document.body.prepend(node);
 
     backdropNode.set(node);
