@@ -26,7 +26,10 @@
 </button>
 
 {#if $isOpen}
-  <div class="flex flex-col divide-y bg-white border border-slate-300 rounded shadow-md pb-1" use:element={content}>
+  <div
+    class="flex flex-col divide-y bg-white border border-slate-300 rounded shadow-md pb-1 z-30"
+    use:element={content}
+  >
     <div class="flex flex-col">
       {#each $filteredOptions as option}
         <button

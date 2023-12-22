@@ -1,10 +1,17 @@
 <script lang="ts">
-  import { Select, type InputOptionItem } from '$lib/components/select/select.js';
+  import { Select, type InputOptionItem, element } from '$lib/components/select/select.js';
   import Example from '$lib/demo/Example.svelte';
   import { ChartBar, ChartPie, PresentationChartLine } from '@steeze-ui/heroicons';
   import Svelect from '$lib/demo/select/Svelect.svelte';
   import { get } from 'svelte/store';
   import SimpleSelect from '$lib/demo/select/SimpleSelect.svelte';
+  import Content from '$lib/demo/select/Content.svelte';
+
+  const chartOptions: InputOptionItem[] = [
+    { label: 'Bar chart', data: { icon: ChartBar } },
+    { label: 'Pie chart', data: { icon: ChartPie } },
+    { label: 'Line chart', data: { icon: PresentationChartLine } },
+  ];
 
   const options: InputOptionItem[] = [
     { label: 'Yellow bug' },
@@ -61,10 +68,7 @@
     minSearchLength: 2,
   };
 
-  const multiAddOptions = [
-    { label: 'Bar chart', isMulti: true, data: { icon: ChartBar } },
-    { label: 'Pie chart', isMulti: true, data: { icon: ChartPie } },
-  ];
+  const multiAddOptions = structuredClone(chartOptions.map((o) => ({ ...o, isMulti: true })));
 
   const multiWithAdd = new Select(multiAddOptions, {
     additions: [
@@ -76,18 +80,15 @@
     minSearchLength: 2,
   });
 
-  const selects = [
-    new Select([
-      { label: 'Bar chart', data: { icon: ChartBar } },
-      { label: 'Pie chart', data: { icon: ChartPie } },
-    ]),
-    new Select([
-      { label: 'Bar chart', isMulti: true, data: { icon: ChartBar } },
-      { label: 'Pie chart', isMulti: true, data: { icon: ChartPie } },
-      { label: 'Line chart', isMulti: true, data: { icon: PresentationChartLine } },
-    ]),
-    new Select(structuredClone(options), config),
-  ];
+  const selects = [new Select(chartOptions), new Select(chartOptions), new Select(structuredClone(options), config)];
+
+  const contextSelect = new Select(chartOptions, {
+    useVirtualElement: true,
+    activeOnOpen: false,
+    triggerEvent: 'contextmenu',
+  });
+  let contextIsOpen = contextSelect.state.isOpen;
+  let contextSelected = contextSelect.state.selected;
 </script>
 
 <div class="flex justify-center">
@@ -127,6 +128,16 @@
           multiWithAdd.setActive(newOption);
         }}
       />
+    </div>
+    <div class="absolute z-20">
+      <h2 class="text-xl">Context menu: <span class="text-sm">{$contextSelected.map((o) => o.id).join(',')}</span></h2>
+      <button
+        class="w-96 h-60 border border-slate-300 rounded-md hover:cursor-default"
+        use:element={contextSelect.elements.trigger}
+      />
+      {#if $contextIsOpen}
+        <Content select={contextSelect} />
+      {/if}
     </div>
   </div>
 </div>

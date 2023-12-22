@@ -2,7 +2,8 @@ import { BROWSER } from 'esm-env';
 import type { ComputeConfig } from 'svelte-floating-ui';
 import type { Action } from 'svelte/action';
 import { get, writable, type Writable } from 'svelte/store';
-import { createPopover } from '../popover/popover.js';
+import { createPopover, defaultVirtualPosition } from '../popover/popover.js';
+import type { VirtualElement } from '@floating-ui/core';
 
 type OptionBase = {
   id: string;
@@ -36,8 +37,11 @@ export type Addition = {
 export type SelectConfig = {
   closeOnSelect: CloseOnSelect;
   minSearchLength: number;
+  triggerEvent?: 'contextmenu' | 'mouseup';
+  activeOnOpen?: boolean;
   additions: Addition[];
   floatingUiOptions?: Partial<ComputeConfig>;
+  useVirtualElement?: boolean;
 };
 
 export type AddOption = {
@@ -102,7 +106,17 @@ export class Select {
   };
 
   constructor(inputOptions: InputOptionItem[], inputConfig: Partial<SelectConfig> = {}) {
-    const config = { ...{ additions: [], closeOnSelect: 'not_multi' as const, minSearchLength: 1 }, ...inputConfig };
+    const config = {
+      ...{
+        additions: [],
+        closeOnSelect: 'not_multi' as const,
+        minSearchLength: 1,
+        activeOnOpen: true,
+        useVirtualElement: false,
+        triggerEvent: 'mouseup' as const,
+      },
+      ...inputConfig,
+    };
     const options = inputOptions.map((option) => Select.inputToOptionItem(option));
 
     this.inputOptions = writable(inputOptions);
@@ -167,7 +181,7 @@ export class Select {
       }
     });
 
-    this.setUpFloatingUi(config.floatingUiOptions);
+    this.setUpFloatingUi(config);
 
     if (BROWSER) {
       document.addEventListener('keydown', (e) => this.onKeyDown(e));
@@ -176,11 +190,15 @@ export class Select {
   }
 
   private open(): void {
-    const selected = get(this.state.selected);
-    if (selected.length > 0) {
-      this.setActive(selected[0]);
+    if (this.config.activeOnOpen) {
+      const selected = get(this.state.selected);
+      if (selected.length > 0) {
+        this.setActive(selected[0]);
+      } else {
+        this.setFirstActive();
+      }
     } else {
-      this.setFirstActive();
+      this.setActive(null);
     }
     get(this.elements.trigger)?.blur();
   }
@@ -188,7 +206,6 @@ export class Select {
   private close(): void {
     this.state.search.set('');
     this.setActive(null);
-    get(this.elements.trigger)?.focus();
   }
 
   selectOption(id: string): OptionSelect | null {
@@ -588,18 +605,16 @@ export class Select {
     }
 
     if (isOpen) {
-      const activeOption = this.getActiveLeaf();
-
-      if (!activeOption) {
-        return;
-      }
-
       switch (event.code) {
         case 'Escape':
           this.state.isOpen.set(false);
           break;
 
-        case 'Enter':
+        case 'Enter': {
+          const activeOption = this.getActiveLeaf();
+          if (!activeOption) {
+            return;
+          }
           if (activeOption.type === 'select') {
             const addOptions = get(this.state.additionOptions);
             const isActiveAdd = addOptions.some((option) => option.id === activeOption.id);
@@ -612,6 +627,7 @@ export class Select {
             this.setChildActive();
           }
           break;
+        }
 
         case 'ArrowDown':
           this.setNextActive();
@@ -641,16 +657,20 @@ export class Select {
     }
   }
 
-  private setUpFloatingUi(config: Partial<ComputeConfig> = {}) {
-    const isOpen = this.state.isOpen;
-    const [floatingTrigger, floatingContent] = createPopover(isOpen, {
-      floatingUi: config,
+  private setUpFloatingUi(config: SelectConfig) {
+    let virtualElement = config.useVirtualElement ? writable<VirtualElement>(defaultVirtualPosition()) : undefined;
+    const [floatingTrigger, floatingContent] = createPopover(this.state.isOpen, {
+      floatingUi: config.floatingUiOptions,
+      virtualElement,
+      triggerEvent: config.triggerEvent,
     });
+
     this.elements.trigger.subscribe((node) => {
       if (node) {
         floatingTrigger(node);
       }
     });
+
     this.elements.content.subscribe((node) => {
       if (node) {
         floatingContent(node);
