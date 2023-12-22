@@ -3,9 +3,10 @@
   import Example from '$lib/demo/Example.svelte';
   import { ChartBar, ChartPie, PresentationChartLine } from '@steeze-ui/heroicons';
   import Svelect from '$lib/demo/select/Svelect.svelte';
-  import { get } from 'svelte/store';
+  import { get, writable } from 'svelte/store';
   import SimpleSelect from '$lib/demo/select/SimpleSelect.svelte';
   import Content from '$lib/demo/select/Content.svelte';
+  import { createPopover } from '$lib/index.js';
 
   const chartOptions: InputOptionItem[] = [
     { label: 'Bar chart', data: { icon: ChartBar } },
@@ -89,6 +90,9 @@
   });
   let contextIsOpen = contextSelect.state.isOpen;
   let contextSelected = contextSelect.state.selected;
+
+  const popoverIsOpen = writable(false);
+  const [popoverTrigger, popoverContent] = createPopover(popoverIsOpen);
 </script>
 
 <div class="flex justify-center">
@@ -116,18 +120,28 @@
     <Example select={selects[0]}>Select</Example>
     <Example select={selects[1]}>Multi select</Example>
     <div>
-      <h2 class="text-xl">Multi with additions</h2>
-      <Svelect
-        select={multiWithAdd}
-        showSearch
-        inputPlaceholder="Search or add..."
-        on:add={({ detail }) => {
-          const newOption = Select.inputToOptionItem({ label: detail.searchText, isMulti: true, selected: true });
-          const newOptions = [...get(multiWithAdd.state.options), newOption];
-          multiWithAdd.inputOptions.set(newOptions);
-          multiWithAdd.setActive(newOption);
-        }}
-      />
+      <h2 class="text-xl">Multi with additions inside of popover</h2>
+      <button
+        use:popoverTrigger
+        class="border border-slate-300 focus:outline-none focus:border-sky-600 rounded-md px-2 py-1"
+      >
+        Open popover with select
+      </button>
+      {#if $popoverIsOpen}
+        <div use:popoverContent class="z-10 bg-white h-60 w-60 border p-6 border-slate-300 rounded-md shadow-md">
+          <Svelect
+            select={multiWithAdd}
+            showSearch
+            inputPlaceholder="Search or add..."
+            on:add={({ detail }) => {
+              const newOption = Select.inputToOptionItem({ label: detail.searchText, isMulti: true, selected: true });
+              const newOptions = [...get(multiWithAdd.state.options), newOption];
+              multiWithAdd.inputOptions.set(newOptions);
+              multiWithAdd.setActive(newOption);
+            }}
+          />
+        </div>
+      {/if}
     </div>
     <div class="">
       <h2 class="text-xl">Context menu: <span class="text-sm">{$contextSelected.map((o) => o.id).join(',')}</span></h2>

@@ -109,7 +109,6 @@ export function createPopover(
 
     let isBackdropClicking = false;
 
-    const backdropNode = getBackdropNode();
     if (BROWSER) {
       node.addEventListener(triggerEvent, triggerClick);
       backdropNode?.addEventListener('mousedown', backdropMouseDown);
@@ -127,7 +126,10 @@ export function createPopover(
   }
 
   function customContent(node: HTMLElement) {
-    showBackdrop(node);
+    if (backdropNode) {
+      showBackdrop(backdropNode, node);
+      node.style.position = config?.floatingUi?.strategy ?? 'absolute';
+    }
     return {
       destroy: () => {
         console.log('destroy:customContent');
@@ -136,9 +138,10 @@ export function createPopover(
   }
 
   const triggerEvent = config?.triggerEvent ?? 'mouseup';
+  const backdropNode = getBackdropNode();
   isOpen.subscribe((value) => {
-    if (!value) {
-      hideBackdrop();
+    if (!value && backdropNode) {
+      hideBackdrop(backdropNode);
     }
   });
 

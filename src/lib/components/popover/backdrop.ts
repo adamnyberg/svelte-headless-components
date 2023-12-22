@@ -1,9 +1,6 @@
 import { BROWSER } from 'esm-env';
-import { get, writable } from 'svelte/store';
 
-const backdropNode = writable<HTMLDivElement | null>(null);
-
-function setUpBackdrop() {
+export function getBackdropNode() {
   if (BROWSER) {
     const node = document.createElement('div');
     node.style.position = 'fixed';
@@ -13,38 +10,24 @@ function setUpBackdrop() {
     node.style.width = '100vw';
     node.style.height = '100vh';
     node.style.display = 'none';
-
-    backdropNode.set(node);
     return node;
   } else {
     return null;
   }
 }
 
-export function getBackdropNode() {
-  let node = get(backdropNode);
-  if (node === null) {
-    node = setUpBackdrop();
-  }
-  return node;
-}
-
-export function showBackdrop(behindNode: HTMLElement) {
+export function showBackdrop(backdropNode: HTMLElement, behindNode: HTMLElement) {
   const computedZIndex = getComputedStyle(behindNode).zIndex;
   let zIndex = computedZIndex ? parseInt(computedZIndex) : 1;
-  const node = getBackdropNode();
   const parent = behindNode.parentNode;
-  if (node && parent) {
-    parent.prepend(node);
+  if (backdropNode && parent) {
+    parent.prepend(backdropNode);
     zIndex -= 1;
-    node.style.zIndex = zIndex.toString();
-    node.style.display = 'block';
+    backdropNode.style.zIndex = zIndex.toString();
+    backdropNode.style.display = 'block';
   }
 }
 
-export function hideBackdrop() {
-  const node = getBackdropNode();
-  if (node) {
-    node.style.display = 'none';
-  }
+export function hideBackdrop(backdropNode: HTMLElement) {
+  backdropNode.style.display = 'none';
 }
