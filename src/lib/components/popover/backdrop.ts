@@ -34,7 +34,9 @@ export function showBackdrop(behindNode: HTMLElement) {
   const computedZIndex = getComputedStyle(behindNode).zIndex;
   let zIndex = computedZIndex ? parseInt(computedZIndex) : 1;
   const node = getBackdropNode();
-  if (node) {
+  const parent = behindNode.parentNode;
+  if (node && parent) {
+    parent.prepend(node);
     zIndex -= 1;
     node.style.zIndex = zIndex.toString();
     node.style.display = 'block';

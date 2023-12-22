@@ -129,7 +129,7 @@
         }}
       />
     </div>
-    <div class="absolute z-20">
+    <div class="">
       <h2 class="text-xl">Context menu: <span class="text-sm">{$contextSelected.map((o) => o.id).join(',')}</span></h2>
       <button
         class="w-96 h-60 border border-slate-300 rounded-md hover:cursor-default"
