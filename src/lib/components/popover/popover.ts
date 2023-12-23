@@ -12,11 +12,6 @@ import { getBackdropNode, hideBackdrop, showBackdrop } from './backdrop.js';
 
 export type FloatingUiNode = HTMLElement | Writable<VirtualElement> | VirtualElement;
 
-export function isElementInPopover(srcElement: EventTarget | null): boolean {
-  if (!srcElement) return false;
-  return !!(srcElement as HTMLElement).closest('[data-popover-id]');
-}
-
 export function defaultVirtualPosition() {
   return {
     getBoundingClientRect: () => {
