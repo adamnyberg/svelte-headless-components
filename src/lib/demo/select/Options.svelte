@@ -42,7 +42,7 @@
   }
 </script>
 
-{#each options as option}
+{#each options as option (option.id)}
   {#if option.type === 'menu' && option.active && floatingOptions[option.id]}
     <button use:element={[select.elements.options, option.id]} use:floatingReference={option.id} />
     <Item {option} />
