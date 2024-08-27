@@ -36,7 +36,7 @@
     {#if $searchOptions.length > 0}
       <div class="flex flex-col">
         {#each $searchOptions as option}
-          <button use:element={[select.elements.options, option.id]}>
+          <button use:element={[select.elements.options, option]}>
             <Item {option} kind="search" />
           </button>
         {/each}
@@ -46,7 +46,7 @@
     {#if config.additions.length > 0}
       <div class="flex flex-col">
         {#each $additionOptions as option}
-          <button use:element={[select.elements.options, option.id]}>
+          <button use:element={[select.elements.options, option]}>
             <Item {option} kind="add" search={$search} />
           </button>
         {/each}

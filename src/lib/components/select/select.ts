@@ -11,6 +11,7 @@ type OptionBase = {
   active: boolean;
   parent: OptionMenu | null;
   data?: Record<string, any>;
+  disabled: boolean;
 };
 
 export type OptionSelect = OptionBase & {
@@ -54,14 +55,20 @@ export type OptionItem = OptionSelect | OptionMenu;
 export type InputOptionItem = InputOptionMenu | InputOptionSelect;
 
 export type WritableElement = Writable<HTMLElement | null>;
-export type WritableOptions = [Writable<HTMLElement[]>, string];
+export type WritableOptions = [Writable<HTMLElement[]>, OptionItem];
 
 const searchOptionPrefix = 'search';
 
 export const element: Action<HTMLElement, WritableElement | WritableOptions> = (node, input) => {
   if (Array.isArray(input)) {
-    const [writableOptions, optionId] = input;
-    node.dataset.id = optionId;
+    const [writableOptions, option] = input;
+    node.dataset.id = option.id;
+    if (option.disabled) {
+      node.dataset.disabled = 'true';
+      if (allowDisabledAttribute(node)) {
+        node.disabled = true;
+      }
+    }
     writableOptions.set([...get(writableOptions), node]);
     return {
       destroy() {
@@ -217,6 +224,10 @@ export class Select {
     if (option === null) {
       return null;
     }
+    if (option.disabled) {
+      return null;
+    }
+
     const previousSelected = option.selected ? true : false;
 
     if (!option.isMulti) {
@@ -523,14 +534,12 @@ export class Select {
     switch (input.type) {
       case 'select':
         const withDefaults = {
-          ...{
-            type: 'select',
-            id: input.label,
-            selected: false,
-            active: false,
-            parent: parent ?? null,
-            isMulti: false,
-          },
+          id: input.label,
+          selected: false,
+          active: false,
+          parent: parent ?? null,
+          isMulti: false,
+          disabled: parent?.disabled ?? false,
           ...input,
         } as OptionSelect;
         return withDefaults;
@@ -544,6 +553,7 @@ export class Select {
             hasSelected: false,
             parent: parent ?? null,
             subOptions: [],
+            disabled: parent?.disabled ?? false,
           },
           ...input,
         } as OptionMenu;
@@ -568,6 +578,7 @@ export class Select {
           parent: null,
           selected: false,
           isMulti: false,
+          disabled: false,
           type: 'select' as const,
         });
       }
@@ -682,4 +693,16 @@ export class Select {
 
 export function filterText(option: OptionItem, input = '') {
   return option.label.toLowerCase().includes(input.toLowerCase());
+}
+
+function allowDisabledAttribute(node: HTMLElement) {
+  return (
+    node instanceof HTMLButtonElement ||
+    node instanceof HTMLFieldSetElement ||
+    node instanceof HTMLOptGroupElement ||
+    node instanceof HTMLOptionElement ||
+    node instanceof HTMLSelectElement ||
+    node instanceof HTMLTextAreaElement ||
+    node instanceof HTMLInputElement
+  );
 }

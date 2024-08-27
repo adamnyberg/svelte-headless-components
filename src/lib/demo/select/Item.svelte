@@ -11,7 +11,7 @@
 <div
   class="flex items-center justify-between min-w-[160px] gap-2 px-2 py-1 {option.active
     ? 'bg-slate-100 text-slate-950'
-    : 'text-slate-500'}"
+    : 'text-slate-600'} {option.disabled ? 'opacity-40' : ''}"
 >
   <div class="flex gap-2">
     {#if option.type === 'select' && option.isMulti}

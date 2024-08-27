@@ -44,13 +44,13 @@
 
 {#each options as option (option.id)}
   {#if option.type === 'menu' && option.active && floatingOptions[option.id]}
-    <button use:element={[select.elements.options, option.id]} use:floatingReference={option.id} />
+    <button use:element={[select.elements.options, option]} use:floatingReference={option.id} />
     <Item {option} />
     <div class="flex flex-col bg-white border border-slate-300 rounded shadow-md pb-1" use:floatingContent={option.id}>
       <svelte:self {select} options={option.subOptions} />
     </div>
   {:else}
-    <button use:element={[select.elements.options, option.id]} class="outline-none">
+    <button use:element={[select.elements.options, option]} class="outline-none">
       <Item {option} />
     </button>
   {/if}
