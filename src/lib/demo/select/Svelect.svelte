@@ -1,6 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
-  import { element, type AddOption, type OptionItem, type Select } from '$lib/components/select/select.js';
+  import { type AddOptionResult, element, type OptionItem, type Select } from '$lib/components/select/select.js';
   import { Icon } from '@steeze-ui/svelte-icon';
   import { ChevronUpDown } from '@steeze-ui/heroicons';
   import Content from './Content.svelte';
@@ -8,7 +8,7 @@
   const dispatch = createEventDispatcher<{
     select: OptionItem;
     change: OptionItem;
-    add: AddOption;
+    add: AddOptionResult;
     open: void;
     close: void;
   }>();

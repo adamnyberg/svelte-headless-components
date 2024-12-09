@@ -80,6 +80,15 @@
       },
     ],
     minSearchLength: 2,
+    validateAddition: async (searchText) => {
+      console.log('validateAddition', searchText);
+      await new Promise((r) => setTimeout(r, 3000));
+      console.log('validateAddition wait done');
+      if (searchText.length < 5) {
+        return false;
+      }
+      return true;
+    },
   });
 
   const selects = [new Select(chartOptions), new Select(chartOptions), new Select(structuredClone(options), config)];
@@ -135,6 +144,7 @@
             showSearch
             inputPlaceholder="Search or add..."
             on:add={({ detail }) => {
+              console.log('on:add', detail);
               const newOption = Select.inputToOptionItem({ label: detail.searchText, isMulti: true, selected: true });
               const newOptions = [...get(multiWithAdd.state.options), newOption];
               multiWithAdd.inputOptions.set(newOptions);

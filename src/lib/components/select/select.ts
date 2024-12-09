@@ -43,7 +43,7 @@ export type SelectConfig = {
   additions: Addition[];
   floatingUiOptions?: Partial<ComputeConfig>;
   useVirtualElement?: boolean;
-  validateAddition?: (search: string) => boolean;
+  validateAddition?: (search: string) => Promise<boolean>;
 };
 
 export type AddOption = {
@@ -130,7 +130,7 @@ export class Select {
       activeOnOpen: true,
       useVirtualElement: false,
       triggerEvent: 'mouseup' as const,
-
+      validateAddition: async () => true,
       ...inputConfig,
     };
     const options = inputOptions.map((option) => Select.inputToOptionItem(option));
@@ -182,10 +182,10 @@ export class Select {
         }
         option.dataset.eventListenersAdded = 'true';
 
-        option.addEventListener('mouseup', () => {
+        option.addEventListener('mouseup', async () => {
           const id = option.dataset.id ?? '';
           if (this.isAddOptionId(id)) {
-            this.addOption(id);
+            await this.addOption(id);
           } else {
             this.selectOption(id);
           }
@@ -273,17 +273,19 @@ export class Select {
     return option;
   }
 
-  addOption(id: string) {
+  async addOption(id: string) {
     const option = this.getSelectOption(id);
     if (option === null) {
       return null;
     }
 
-    if (this.config.validateAddition && !this.config.validateAddition(get(this.state.search))) {
-      this.events.onAdd.set({ err: true, id: option.id, searchText: get(this.state.search) });
-    } else {
+    const valid = this.config.validateAddition ? await this.config.validateAddition(get(this.state.search)) : true;
+
+    if (valid) {
       this.events.onAdd.set({ err: false, id: option.id, searchText: get(this.state.search) });
       this.resetSearch();
+    } else {
+      this.events.onAdd.set({ err: true, id: option.id, searchText: get(this.state.search) });
     }
   }
 
@@ -621,7 +623,7 @@ export class Select {
     }
   }
 
-  onKeyUp(event: KeyboardEvent) {
+  async onKeyUp(event: KeyboardEvent) {
     const isOpen = get(this.state.isOpen);
     if (!isOpen && event.code === 'Enter' && document.activeElement === get(this.elements.trigger)) {
       this.state.isOpen.set(true);
@@ -643,7 +645,7 @@ export class Select {
             const addOptions = get(this.state.additionOptions);
             const isActiveAdd = addOptions.some((option) => option.id === activeOption.id);
             if (isActiveAdd) {
-              this.addOption(activeOption.id);
+              await this.addOption(activeOption.id);
             } else {
               this.selectOption(activeOption.id);
             }

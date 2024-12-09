@@ -33,7 +33,7 @@
     <div class="flex flex-col">
       {#each $filteredOptions as option}
         <button
-          use:element={[options, option.id]}
+          use:element={[options, option]}
           class="flex px-3 py-1 {option.active ? 'bg-slate-100 text-slate-950' : 'text-slate-500'}"
         >
           {option.label}
