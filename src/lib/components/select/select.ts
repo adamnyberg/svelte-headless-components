@@ -43,12 +43,22 @@ export type SelectConfig = {
   additions: Addition[];
   floatingUiOptions?: Partial<ComputeConfig>;
   useVirtualElement?: boolean;
+  validateAddition?: (search: string) => boolean;
 };
 
 export type AddOption = {
+  err: false;
   id: string;
   searchText: string;
 };
+
+export type AddOptionFail = {
+  err: true;
+  id: string;
+  searchText: string;
+};
+
+export type AddOptionResult = AddOption | AddOptionFail;
 
 export type OptionItem = OptionSelect | OptionMenu;
 
@@ -99,7 +109,7 @@ export class Select {
   readonly events = {
     onSelect: writable<OptionSelect>(),
     onChange: writable<OptionSelect>(),
-    onAdd: writable<AddOption>(),
+    onAdd: writable<AddOptionResult>(),
   };
 
   readonly state = {
@@ -114,14 +124,13 @@ export class Select {
 
   constructor(inputOptions: InputOptionItem[], inputConfig: Partial<SelectConfig> = {}) {
     const config = {
-      ...{
-        additions: [],
-        closeOnSelect: 'not_multi' as const,
-        minSearchLength: 1,
-        activeOnOpen: true,
-        useVirtualElement: false,
-        triggerEvent: 'mouseup' as const,
-      },
+      additions: [],
+      closeOnSelect: 'not_multi' as const,
+      minSearchLength: 1,
+      activeOnOpen: true,
+      useVirtualElement: false,
+      triggerEvent: 'mouseup' as const,
+
       ...inputConfig,
     };
     const options = inputOptions.map((option) => Select.inputToOptionItem(option));
@@ -270,8 +279,12 @@ export class Select {
       return null;
     }
 
-    this.events.onAdd.set({ id: option.id, searchText: get(this.state.search) });
-    this.resetSearch();
+    if (this.config.validateAddition && !this.config.validateAddition(get(this.state.search))) {
+      this.events.onAdd.set({ err: true, id: option.id, searchText: get(this.state.search) });
+    } else {
+      this.events.onAdd.set({ err: false, id: option.id, searchText: get(this.state.search) });
+      this.resetSearch();
+    }
   }
 
   getMenuOptions(): OptionMenu[] {
